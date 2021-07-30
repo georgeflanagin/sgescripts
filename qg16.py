@@ -5,6 +5,7 @@
 # to determine the resources requested
 #
 
+import argparse
 import sys 
 import os
 import re
@@ -38,78 +39,100 @@ def bytes(memstr:str) -> str:
         s = s+'W'
     return eval(s.replace("B","*1").replace("W","*8").replace("G","*1024M").replace("M","*1024K").replace("K","*1024"))
 
-def usage() -> None:
-    # If we don't do this, Python will think these are local variables.
-    # In fact, they are defined above.
-    global vs, version, queue, qs
+####################################################################################
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# def usage() -> None:
+#     # If we don't do this, Python will think these are local variables.
+#     # In fact, they are defined above.
+#     global vs, version, queue, qs
+# 
+#     print(f"""
+#         usage: qg16 [-h] [-n] [-q {qs}s] [-v {vs}s] g16-input-file 
+#             -h prints this helps and exists
+#             -n do not execute the job but only create the script file
+#             -q queue to run in. Default {queue}s.
+#             -v version to run. Default {version}s.
+#         """) 
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-    print(f"""
-        usage: qg16 [-h] [-n] [-q {qs}s] [-v {vs}s] g16-input-file 
-            -h prints this helps and exists
-            -n do not execute the job but only create the script file
-            -q queue to run in. Default {queue}s.
-            -v version to run. Default {version}s.
-        """) 
 
 # parse arguments
-try:
-    opts, args = getopt.getopt(sys.argv[1:],'hnq:v:')
-except getopt.GetoptError as err:
-    print(f"{err=}")
-    usage()
-    # Ordinarily, you should sys.exit() with a reserved symbol like os.EX_DATAERR,
-    # but I don't know what program is on the receiving end of this code, so I'm
-    # leaving these as explicit integers.
-    sys.exit(1)
+parser = argparse.ArgumentParser(prog='qg16')
 
-# This for-loop is outside of a function, so we don't need to 
-# declare these to be global; i.e., this code is also at global
-# scope. opts is a list of tuples, so we are implictly separating
-# the elements of each tuple into two variables: o and a.
-for o, a in opts:
-    # These lines reverse the boolean value of the variables
-    # if these switches appear in the command line.
-    if o == '-n': execute = False
-    if o == '-q': queue=a
-    if o == '-v': version=a
-    if o == '-h':
-        usage()
-        sys.exit(2)
+parser.add_argument('-q', '--queue', type=str, default='all', 
+    help='Name of the queue', choices=queues)
+parser.add_argument('-n', '--no-execute', action='store_true', 
+    help="Flag to prevent execution")
+parser.add_argument('-v', '--version', type=str, default='B',
+    help="The shorthand for the version of Gaussian", choices=versions.keys())
+parser.add_argument('fname', type=str, 
+    help="Name of the input file.")
 
-if not queue in queues:
-    print(f"Error in the -q argument value, which should be one of: {qs}")
-    sys.exit(3)
+myargs = parser.parse_args()
 
-if not version in versions:
-    print("Error in -v argument value, which should be one of: {vs}")
-    sys.exit(4)
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# try:
+#     opts, args = getopt.getopt(sys.argv[1:],'hnq:v:')
+# except getopt.GetoptError as err:
+#     print(f"{err=}")
+#     usage()
+#     # Ordinarily, you should sys.exit() with a reserved symbol like os.EX_DATAERR,
+#     # but I don't know what program is on the receiving end of this code, so I'm
+#     # leaving these as explicit integers.
+#     sys.exit(1)
+# 
+# # This for-loop is outside of a function, so we don't need to 
+# # declare these to be global; i.e., this code is also at global
+# # scope. opts is a list of tuples, so we are implictly separating
+# # the elements of each tuple into two variables: o and a.
+# for o, a in opts:
+#     # These lines reverse the boolean value of the variables
+#     # if these switches appear in the command line.
+#     if o == '-n': execute = False
+#     if o == '-q': queue=a
+#     if o == '-v': version=a
+#     if o == '-h':
+#         usage()
+#         sys.exit(2)
+# 
+# if not queue in queues:
+#     print(f"Error in the -q argument value, which should be one of: {qs}")
+#     sys.exit(3)
+# 
+# if not version in versions:
+#     print("Error in -v argument value, which should be one of: {vs}")
+#     sys.exit(4)
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-g16root = versions[version]
+g16root = versions[myargs.version]
 
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # only last non option is the filename. I removed the len(args)>0 test,
 # and replaced it with the more usual statement.
-if len(args): 
-    fname = args.pop()
-else:
-    print("Provide a filename")
-    usage()
-    sys.exit(5)
+# if len(args): 
+#     fname = args.pop()
+# else:
+#     print("Provide a filename")
+#     usage()
+#     sys.exit(5)
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-if not os.path.exists(fname):
-    print (f'File {fname} does not exist. Exiting....')
+if not os.path.exists(myargs.fname):
+    print (f'File {myargs.fname} does not exist. Exiting....')
     sys.exit(2)
 
 # determine the name of job. This code looks from the RHS (rindex)
 # for a dot (.), it then chops the string at that point, removing 
 # the suffix. If that doesn't work, then we take job = fname in situ.
+
 try:    
-    job = fname[0:fname.rindex('.')]
+    job = myargs.fname[0:myargs.fname.rindex('.')]
 except ValueError as e: 
-    job = fname
+    job = myargs.fname
 
 # jobname=job
 # if (jobname[0].isdigit()): jobname="q_"+job
-jobname = f"q_{job}" if jobname[0].isdigit() else job
+jobname = f"q_{job}" if job[0].isdigit() else job
 
 # the defaults for g16 without any override from Default.Route
 nodes = 1
@@ -123,63 +146,72 @@ maxdisk = 0
 # global settings
 deffile = ""
 
-# Read these files if they exist, and concat their contents into deffile
-if os.path.exists(f"{g16root}/g16/Default.Route"): deffile = open(defaultRoute).read()
-if os.path.exists('Default.Route'): deffile += open('Default.Route').read()
+for fname in ( _ for _ in (f"{g16root}/g16/Default.Route", 'Default.Route') if os.path.exists(_) ):
+    with open(fname) as f:
+        deffile += f.read()
 
-# If deffile has nothing in it, then we have to make some changes.
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# Read these files if they exist, and concat their contents into deffile
+# if os.path.exists(f"{g16root}/g16/Default.Route"): deffile = open(defaultRoute).read()
+# if os.path.exists('Default.Route'): deffile += open('Default.Route').read()
+#XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# If deffile has something in it, then we have to make some changes.
 if len(deffile):
     # -M- memory default in words (1 word = 8 bytes)  equivalent to %mem
     pat = re.compile(r'-M-.*?([0-9]+[kmg][bw])',re.IGNORECASE)
-    ss = map(bytes, re.findall(pat, deffile))
-    if len(ss): mem = ss.pop()
+    mem = list(map(bytes, re.findall(pat, deffile))).pop()
 
     # -P- numproc shared  equivalent to %nprocshared 
     pat = re.compile(r'-P-.*?([0-9])', re.IGNORECASE)
-    ss = map(int, re.findall(pat,deffile))
-    if len(ss): ppn = ss.pop()
+    ppn= list(map(int, re.findall(pat,deffile))).pop()
 
     # -#- Maxdisk=xxx
     pat = re.compile(r'-#-.*?maxdisk.*?([0-9]+[kmg][bw])',re.IGNORECASE)
-    ss = map(bytes, re.findall(pat, deffile))
-    if len(ss): maxdisk = ss.pop()
+    maxdisk = list(map(bytes, re.findall(pat, deffile))).pop()
 
 # determine the overrides as requested by the job itself
-comfile = open(fname).read()
+comfile = open(myargs.fname).read()
 
 # the rest of the computational resources once they have been established
 # need to be appended to the resources list with ppn first!!!
 resources = []
 
 # %nproc and %nprocshared requested to determine ppn=xxx
-nproc = ppn                      # minimially default pnn
 pat = re.compile(r'%nproc=([0-9]+)', re.IGNORECASE)
-ss = map(int, re.findall(pat, comfile))
-if len(ss) > 0: nproc=max(ss)    # nproc is really what the comfile wanted
+try:
+    nproc = max(map(int, re.findall(pat, comfile)))
+except ValueError as e:
+    nproc = ppn                      # minimially default pnn
 
 #print "nproc="+str(nproc)
 # %nprocshared if it exists (seemed to be part of g16 as well)
 # that can override the -P-, which is really the number of processors (%nproc)
 # as well
-nprocs = ppn                      # minimially default pnn
 pat = re.compile(r'%nprocs.*?=([0-9]+)', re.IGNORECASE)
-ss = map(int, re.findall(pat, comfile))
-if len(ss) > 0: nprocs=max(ss)    # nprocs is really what the comfile wanted
-#print "nprocs="+str(nprocs)
+try:
+    nprocs = max(map(int, re.findall(pat, comfile)))
+except ValueError as e:
+    nprocs = ppn                      # minimially default pnn
 ppn = max(nprocs,nproc)           # pick the higher of nprocs or nprocshared
 
 # %mem requested to determine mem=xxxmb
 pat = re.compile(r'%mem.*?=([0-9]+[kmg][bw])', re.IGNORECASE)
-ss = map(bytes,re.findall(pat, comfile))
-if len(ss) > 0: mem=max(ss)    # memory is really what the comfile wanted
-mem = max(mem, minmem)         # but PBS seems to have a minimum requirement?
+mem = 0
+try:
+    mem = max(map(bytes,re.findall(pat, comfile)))
+except ValueError as e:
+    mem = max(mem, minmem)         # but PBS seems to have a minimum requirement?
 resources.append(f"mem_free={mem//(1024*1024)}M")
 
 # maxdisk requested to determine file=xxxxmb
 pat = re.compile(r'maxdisk=([0-9]+[kmg][bw])', re.IGNORECASE)
-ss = map(bytes,re.findall(pat, comfile))
-if len(ss): maxdisk= max(ss) # maxdisk is really what the comfile wanted
-if maxdisk: resources.append("diskfree="+str(maxdisk/(1024*1024))+"M")
+
+maxdisk = 0
+try:
+    maxdisk = max(map(bytes,re.findall(pat, comfile)))
+except ValueError as e:
+    if maxdisk: resources.append("diskfree="+str(maxdisk/(1024*1024))+"M")
 
 # collected a node-based resources: make the resourceline for SGE script
 # only a #$ -l by itself causes a problem
@@ -229,7 +261,7 @@ echo job running on `hostname` with GAUSS_SCRDIR as $GAUSS_SCRDIR
 with open(scriptfile,'w') as f:
     f.write(scriptform())
 
-if execute:
+if not myargs.no_execute:
     os.system(f"sbatch {scriptfile}")
     os.system(f"rm -f {scriptfile}")
 
