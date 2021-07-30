@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 #
 # python script to generate and execute an SGE script to run the single
 # argument filename as a g16 job parsing the DefaultRoute and job file
@@ -122,14 +122,13 @@ maxdisk = 0
 # internally concatenate local to global so local is last and overrides 
 # global settings
 deffile = ""
-defaultRoute = f"{g16root}/g16/Default.Route"
 
 # Read these files if they exist, and concat their contents into deffile
-if os.path.exists(defaultRoute): deffile = open(defaultRoute).read()
+if os.path.exists(f"{g16root}/g16/Default.Route"): deffile = open(defaultRoute).read()
 if os.path.exists('Default.Route'): deffile += open('Default.Route').read()
 
 # If deffile has nothing in it, then we have to make some changes.
-if len(deffile) > 0:
+if len(deffile):
     # -M- memory default in words (1 word = 8 bytes)  equivalent to %mem
     pat = re.compile(r'-M-.*?([0-9]+[kmg][bw])',re.IGNORECASE)
     ss = map(bytes, re.findall(pat, deffile))
@@ -231,6 +230,6 @@ with open(scriptfile,'w') as f:
     f.write(scriptform())
 
 if execute:
-    os.system(f"qsub {scriptfile}")
+    os.system(f"sbatch {scriptfile}")
     os.system(f"rm -f {scriptfile}")
 
